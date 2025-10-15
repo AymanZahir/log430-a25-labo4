@@ -80,9 +80,14 @@ def get_highest_spending_users_redis():
     result = []
     try: 
         start_time = time.time()
-        # TODO: optimiser
         r = get_redis_conn()
         limit = 10
+        cache_key = "reports:highest_spending_users"
+
+        cached_report = r.hget(cache_key, "data")
+        if cached_report:
+            return json.loads(cached_report)
+
         order_keys = r.keys("order:*")
         spending = defaultdict(float)
         
@@ -100,6 +105,8 @@ def get_highest_spending_users_redis():
                 "user_id": user[0],
                 "total_expense": round(user[1], 2)
             })
+        r.hset(cache_key, mapping={"data": json.dumps(result)})
+        r.expire(cache_key, 60)
 
     except Exception as e:
         return {'error': str(e)}
@@ -113,9 +120,14 @@ def get_best_selling_products_redis():
     result = []
     try:
         start_time = time.time()
-        # TODO: optimiser
         r = get_redis_conn()
         limit = 10
+        cache_key = "reports:best_selling_products"
+
+        cached_report = r.hget(cache_key, "data")
+        if cached_report:
+            return json.loads(cached_report)
+
         order_keys = r.keys("order:*")
         product_sales = defaultdict(int)
         
@@ -139,6 +151,8 @@ def get_best_selling_products_redis():
                 "product_id": product[0],
                 "quantity_sold": product[1]
             })
+        r.hset(cache_key, mapping={"data": json.dumps(result)})
+        r.expire(cache_key, 60)
 
     except Exception as e:
         return {'error': str(e)}

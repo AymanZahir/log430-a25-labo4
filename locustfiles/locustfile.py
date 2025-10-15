@@ -3,14 +3,51 @@ Locustfile for load testing store_manager.py
 SPDX - License - Identifier: LGPL - 3.0 - or -later
 Auteurs : Gabriel C. Ullmann, Fabio Petrillo, 2025
 """
+import random
 from locust import HttpUser, task, between
 
 class FlaskAPIUser(HttpUser):
-    # Wait time between requests (1-3 seconds)
+    # Temps d'attente entre les requêtes (1 à 3 secondes)
     wait_time = between(1, 3)
-        
-    # Proportion 1:1, meaning 1/2 + 1/2
-    # This means 50% calls to /highest-spenders, 50% calls to /best-sellers
+    
+    # Proportion d'exécution 1:1:1, ce qui signifie : 1/3, 1/3, 1/3
+    @task(1) 
+    def orders(self):
+        """Test POST /orders endpoint (write)"""
+        user_id = random.randint(1, 3)
+        product_ids = random.sample(range(1, 5), k=3)
+        mock_order = {
+            "user_id": user_id,
+            "items": [{
+                "product_id": product_ids[0],
+                "quantity": random.randint(1, 5)
+            }]
+        }   
+
+        # Ajouter aléatoirement plusieurs articles (30 % des fois)
+        if random.randint(1, 10) <= 3:
+            for product_id in product_ids[1:]:
+                mock_order["items"].append({
+                    "product_id": product_id,
+                    "quantity": random.randint(1, 5)
+                })
+
+        with self.client.post("/orders", 
+                            json=mock_order, 
+                            headers={"Content-Type": "application/json"},
+                            catch_response=True) as response:
+            try:
+                data = response.json()
+                if response.status_code == 201:
+                    if "order_id" in data:
+                        response.success()
+                    else:
+                        response.failure("Aucun ID renvoyé pour la commande créée")
+                else:
+                    response.failure(f"Erreur : {response.status_code} - {data.get('error', 'Unknown error')}")
+            except ValueError:
+                response.failure(f"Invalid JSON response: {response.text}")
+
     @task(1) 
     def highest_spenders(self):
         """Test GET /orders/reports/highest-spenders endpoint (read)"""
@@ -25,7 +62,7 @@ class FlaskAPIUser(HttpUser):
                 else:
                     response.failure(f"Erreur : {response.status_code} - {data.get('error', 'Unknown error')}")
             except ValueError:
-                response.failure(f"Invalid JSON response: {response.text}, code {response.status_code}")
+                response.failure(f"Invalid JSON response: {response.text}")
 
     @task(1) 
     def best_sellers(self):
@@ -41,4 +78,4 @@ class FlaskAPIUser(HttpUser):
                 else:
                     response.failure(f"Erreur : {response.status_code} - {data.get('error', 'Unknown error')}")
             except ValueError:
-                response.failure(f"Invalid JSON response: {response.text}, {response.status_code}")
+                response.failure(f"Invalid JSON response: {response.text}")

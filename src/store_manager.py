@@ -5,7 +5,7 @@ Auteurs : Gabriel C. Ullmann, Fabio Petrillo, 2025
 """
 import threading
 from graphene import Schema
-from stocks.schemas.query import Query
+from prometheus_client import Counter, CONTENT_TYPE_LATEST, generate_latest
 from flask import Flask, request, jsonify
 from orders.controllers.order_controller import create_order, remove_order, get_order, get_report_highest_spending_users, get_report_best_selling_products
 from orders.controllers.user_controller import create_user, remove_user, get_user
@@ -13,6 +13,11 @@ from stocks.controllers.product_controller import create_product, remove_product
 from stocks.controllers.stock_controller import get_stock, set_stock, get_stock_overview, populate_redis_on_startup
  
 app = Flask(__name__)
+
+# Prometheus counters (total is added automatically to the metric name)
+counter_orders = Counter('orders', 'Total calls to /orders endpoint')
+counter_highest_spenders = Counter('highest_spenders', 'Total calls to /orders/reports/highest-spenders endpoint')
+counter_best_sellers = Counter('best_sellers', 'Total calls to /orders/reports/best-sellers endpoint')
 
 # Auto-populate Redis 15s after API startup (to give enough time for the DB to start up as well)
 thread = threading.Timer(2.0, populate_redis_on_startup)
@@ -24,10 +29,16 @@ def health():
     """Return OK if app is up and running"""
     return jsonify({'status':'ok'})
 
+@app.route("/metrics")
+def metrics():
+    """Expose Prometheus metrics"""
+    return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
+
 # Write routes (Commands)
 @app.post('/orders')
 def post_orders():
     """Create a new order based on information on request body"""
+    counter_orders.inc()
     return create_order(request)
 
 @app.delete('/orders/<int:order_id>')
@@ -84,12 +95,14 @@ def get_stocks(product_id):
 @app.get('/orders/reports/highest-spenders')
 def get_orders_highest_spending_users():
     """Get list of highest speding users, ordered by total expenditure"""
+    counter_highest_spenders.inc()
     rows = get_report_highest_spending_users()
     return jsonify(rows)
 
 @app.get('/orders/reports/best-sellers')
 def get_orders_report_best_selling_products():
     """Get list of best selling products, ordered by number of orders"""
+    counter_best_sellers.inc()
     rows = get_report_best_selling_products()
     return jsonify(rows)
 

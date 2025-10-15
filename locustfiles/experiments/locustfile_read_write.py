@@ -14,17 +14,23 @@ class FlaskAPIUser(HttpUser):
     @task(1) 
     def orders(self):
         """Test POST /orders endpoint (write)"""
-        # TODO: ajoutez des IDs aléatoires de 1-3
+        user_id = random.randint(1, 3)
+        product_ids = random.sample(range(1, 5), k=3)
         mock_order = {
-            "user_id": 0,
-            "items": [{"product_id": 0, "quantity": 1}] 
+            "user_id": user_id,
+            "items": [{
+                "product_id": product_ids[0],
+                "quantity": random.randint(1, 5)
+            }]
         }   
 
         # Ajouter aléatoirement plusiers articles (30 % des fois)
         if random.randint(1, 10) <= 3:
-            # TODO: ajoutez des IDs aléatoires de 1-4
-            mock_order["items"].append({"product_id": 0, "quantity": 1})
-            mock_order["items"].append({"product_id": 1, "quantity": 2})
+            for product_id in product_ids[1:]:
+                mock_order["items"].append({
+                    "product_id": product_id,
+                    "quantity": random.randint(1, 5)
+                })
 
         with self.client.post("/orders", 
                             json=mock_order, 

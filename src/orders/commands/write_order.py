@@ -19,16 +19,13 @@ def add_order(user_id: int, items: list):
     if not items:
         raise ValueError("Cannot create order. An order must have 1 or more items.")
 
-    product_ids = [item['product_id'] for item in items]
     session = get_sqlalchemy_session()
 
     try:
         start_time = time.time()
-        # TODO: optimiser
-        product_prices = {}
-        for product_id in product_ids:
-            products = session.query(Product).filter(Product.id == product_id).all()
-            product_prices[product_id] = products[0].price
+        product_ids = {item['product_id'] for item in items}
+        products = session.query(Product).filter(Product.id.in_(product_ids)).all()
+        product_prices = {product.id: product.price for product in products}
         total_amount = 0
         order_items = []
         
@@ -123,4 +120,3 @@ def delete_order_from_redis(order_id):
     """Delete order from Redis"""
     r = get_redis_conn()
     r.delete(f"order:{order_id}")
-
